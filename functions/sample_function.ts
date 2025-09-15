@@ -45,20 +45,16 @@ export default SlackFunction(
   SampleFunctionDefinition,
   async ({ inputs, client }) => {
     const uuid = crypto.randomUUID();
-    
-    // 日本時間（JST）を取得するための処理
-    // JSTはUTC+9時間
-    const now = new Date();
-    // JST用のオフセット（ミリ秒）を追加
-    const jstOffset = 9 * 60 * 60 * 1000; // 9時間をミリ秒に変換
-    const currentDate = new Date(now.getTime() + jstOffset);
-    
-    const startDate = new Date("2025-04-01T00:00:00+09:00"); // 日本時間で指定
+    const currentDate = new Date();
+    const startDate = new Date("2025-09-11");
+    const endDate = new Date("2026-01-21");
     const timestamp = currentDate.toISOString();
     const date = currentDate.toLocaleDateString("ja-JP");
+    const startDateFormatted = startDate.toLocaleDateString("ja-JP");
+    const endDateFormatted = endDate.toLocaleDateString("ja-JP");
     
     // 経過日数を計算
-    const totalDays = 129;
+    const totalDays = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
     const elapsedDays = Math.floor((currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
     const elapsedRate = Math.round((elapsedDays / totalDays) * 100 * 10) / 10; // 小数点第1位まで丸める
 
@@ -76,7 +72,8 @@ export default SlackFunction(
     const updatedMsg = 
       `:chart_with_upwards_trend: <@${inputs.user}>さんの学習進捗記録（${date}）:\n\n` +
       `• 学習の進捗率: *${inputs.progress}%*\n` +
-      `• 経過日数率: *${elapsedRate}%* (${elapsedDays}/${totalDays}日)\n\n` +
+      `• 経過日数率: *${elapsedRate}%* (${elapsedDays}/${totalDays}日)\n` +
+      `• 期間: ${startDateFormatted} ～ ${endDateFormatted}\n\n` +
       `${comparisonMessage}`;
 
     const sampleObject = {
