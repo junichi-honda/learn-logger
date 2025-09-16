@@ -45,9 +45,14 @@ export default SlackFunction(
   SampleFunctionDefinition,
   async ({ inputs, client }) => {
     const uuid = crypto.randomUUID();
-    const currentDate = new Date();
-    const startDate = new Date("2025-09-11");
-    const endDate = new Date("2026-01-21");
+    // 日本時間（JST）で日付を設定
+    const now = new Date();
+    // UTC時間から日本時間に調整（UTC+9時間）
+    const jstOffset = 9 * 60 * 60 * 1000; // 9時間をミリ秒に変換
+    const currentDate = new Date(now.getTime() + jstOffset);
+    // 日本時間で開始日と終了日を設定（YYYY-MM-DDT00:00:00+09:00 形式）
+    const startDate = new Date("2025-09-11T00:00:00+09:00");
+    const endDate = new Date("2026-01-21T00:00:00+09:00");
     const timestamp = currentDate.toISOString();
     const date = currentDate.toLocaleDateString("ja-JP");
     const startDateFormatted = startDate.toLocaleDateString("ja-JP");
