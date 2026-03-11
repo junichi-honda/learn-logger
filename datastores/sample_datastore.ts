@@ -5,11 +5,14 @@ import { DefineDatastore, Schema } from "deno-slack-sdk/mod.ts";
  * Slackがホストする場所です。
  * https://api.slack.com/automation/datastores
  */
-const SampleObjectDatastore = DefineDatastore({
-  name: "SampleObjects",
+const LearningLogDatastore = DefineDatastore({
+  name: "LearningLogs",
   primary_key: "object_id",
   attributes: {
     object_id: {
+      type: Schema.types.string,
+    },
+    user_id: {
       type: Schema.types.string,
     },
     original_msg: {
@@ -24,4 +27,4 @@ const SampleObjectDatastore = DefineDatastore({
   },
 });
 
-export default SampleObjectDatastore;
+export default LearningLogDatastore;

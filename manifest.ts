@@ -1,6 +1,6 @@
 import { Manifest } from "deno-slack-sdk/mod.ts";
-import SampleWorkflow from "./workflows/sample_workflow.ts";
-import SampleObjectDatastore from "./datastores/sample_datastore.ts";
+import LearnLogWorkflow from "./workflows/sample_workflow.ts";
+import LearningLogDatastore from "./datastores/sample_datastore.ts";
 
 /**
  * The app manifest contains the app's configuration. This
@@ -12,9 +12,9 @@ export default Manifest({
   displayName: "learn logger",
   description: "learn logger",
   icon: "assets/default_new_app_icon.png",
-  workflows: [SampleWorkflow],
+  workflows: [LearnLogWorkflow],
   outgoingDomains: [],
-  datastores: [SampleObjectDatastore],
+  datastores: [LearningLogDatastore],
   botScopes: [
     "commands",
     "chat:write",
