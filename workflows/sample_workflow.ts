@@ -1,5 +1,5 @@
 import { DefineWorkflow, Schema } from "deno-slack-sdk/mod.ts";
-import { SampleFunctionDefinition } from "../functions/sample_function.ts";
+import { ProcessLearningProgressFunction } from "../functions/sample_function.ts";
 
 /**
  * ワークフローは順番に実行される一連のステップです。
@@ -9,7 +9,7 @@ import { SampleFunctionDefinition } from "../functions/sample_function.ts";
  * このワークフローはインタラクティブ機能を使用しています。詳細はこちら：
  * https://api.slack.com/automation/forms#add-interactivity
  */
-const SampleWorkflow = DefineWorkflow({
+const LearnLogWorkflow = DefineWorkflow({
   callback_id: "sample_workflow",
   title: "Learning Progress Logger",
   description: "Record learning progress workflow",
@@ -34,18 +34,18 @@ const SampleWorkflow = DefineWorkflow({
  * OpenForm Slack関数を使用することをお勧めします。
  * https://api.slack.com/automation/functions#open-a-form
  */
-const inputForm = SampleWorkflow.addStep(
+const inputForm = LearnLogWorkflow.addStep(
   Schema.slack.functions.OpenForm,
   {
     title: "Record Learning Progress",
-    interactivity: SampleWorkflow.inputs.interactivity,
+    interactivity: LearnLogWorkflow.inputs.interactivity,
     submit_label: "Record",
     fields: {
       elements: [{
         name: "channel",
         title: "Channel to record progress",
         type: Schema.slack.types.channel_id,
-        default: SampleWorkflow.inputs.channel,
+        default: LearnLogWorkflow.inputs.channel,
       }, {
         name: "progress",
         title: "Learning progress (%)",
@@ -65,9 +65,9 @@ const inputForm = SampleWorkflow.addStep(
  * 出力を提供します。
  * https://api.slack.com/automation/functions/custom
  */
-const sampleFunctionStep = SampleWorkflow.addStep(SampleFunctionDefinition, {
+const progressStep = LearnLogWorkflow.addStep(ProcessLearningProgressFunction, {
   progress: inputForm.outputs.fields.progress,
-  user: SampleWorkflow.inputs.user,
+  user: LearnLogWorkflow.inputs.user,
 });
 
 /**
@@ -76,9 +76,9 @@ const sampleFunctionStep = SampleWorkflow.addStep(SampleFunctionDefinition, {
  * ワークフロー内でカスタム関数と一緒に使用できます。
  * https://api.slack.com/automation/functions
  */
-SampleWorkflow.addStep(Schema.slack.functions.SendMessage, {
+LearnLogWorkflow.addStep(Schema.slack.functions.SendMessage, {
   channel_id: inputForm.outputs.fields.channel,
-  message: sampleFunctionStep.outputs.updatedMsg,
+  message: progressStep.outputs.updatedMsg,
 });
 
-export default SampleWorkflow;
+export default LearnLogWorkflow;
