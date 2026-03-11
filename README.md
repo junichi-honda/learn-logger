@@ -1,141 +1,130 @@
-# Learn Logger
+# 学習進捗ロガー（Learn Logger）
 
-[![Language: Japanese](https://img.shields.io/badge/lang-ja-red.svg)](README.ja.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-*Read this in other languages: [日本語](README.ja.md)*
+学期・科目単位で学習の進捗率を記録し、経過時間と比較する Slack アプリです。
 
-A Slack app for tracking learning progress per subject and comparing it against elapsed time in a semester.
+## 概要
 
-## Overview
+学期と科目を登録し、科目ごとの進捗率をモーダルから記録できます。単位数による加重平均や、経過時間率との比較をプログレスバーで視覚的に確認でき、学習ペースの把握に役立ちます。
 
-This Slack automation app helps you manage semesters, register subjects with credits, record per-subject progress percentages, and compare them with elapsed time to keep you on track with your goals.
+## 機能
 
-## Features
+単一のショートカットからメインメニューを開き、以下の操作を行えます。
 
-- Create and manage semesters (year, season, start/end dates)
-- Register subjects with credit weights per semester
-- Record per-subject learning progress (%) through interactive modals
-- View all subjects' progress with weighted average calculation
-- Compare progress rate vs. elapsed time with visual progress bars
-- Close semesters with a final summary report
+- **学期を作成する** — 年度、学期区分（春/秋）、開始日・終了日を登録
+- **科目を追加する** — アクティブな学期に科目名と単位数を登録（連続追加対応）
+- **科目を管理する** — 登録済み科目の編集・削除
+- **進捗を記録する** — 科目を選んで進捗率（0〜100%）を入力
+- **進捗を確認する** — 全科目の進捗をプログレスバー付きで一覧表示
+- **学期を終了する** — アクティブな学期を終了し最終レポートを生成
 
-## Prerequisites
+## 前提条件
 
-- [Slack CLI](https://api.slack.com/automation/cli) installed and configured
-- Slack workspace with a paid plan
-- Deno runtime environment
+- [Slack CLI](https://api.slack.com/automation/quickstart) がインストール済み
+- 有料プランの Slack ワークスペース
+- Deno ランタイム
 
-## Quick Start
+## セットアップ
 
-### Installation
+### インストール
 
 ```bash
-# Clone this project
-git clone https://github.com/jhonda/learn-logger.git
-
-# Change into the project directory
+git clone https://github.com/junichi-honda/learn-logger.git
 cd learn-logger
 ```
 
-### Running Locally
+### ローカルでの実行
 
 ```bash
 slack run
 ```
 
-Your app will have `(local)` appended to its name. Press `<CTRL> + C` to stop.
+`<CTRL> + C` で停止します。
 
-### Create Triggers
-
-Create triggers for each workflow:
+### トリガーの作成
 
 ```bash
-slack trigger create --trigger-def triggers/semester_setup_trigger.ts
-slack trigger create --trigger-def triggers/subject_setup_trigger.ts
-slack trigger create --trigger-def triggers/log_progress_trigger.ts
-slack trigger create --trigger-def triggers/view_progress_trigger.ts
-slack trigger create --trigger-def triggers/semester_close_trigger.ts
+slack trigger create --trigger-def triggers/learn_logger_trigger.ts
 ```
 
-Each command generates a Shortcut URL. Share the links in Slack to use the app.
+発行されたショートカット URL をチャンネルにブックマークして使用します。
 
-### Deploying to Production
+### デプロイ
 
 ```bash
 slack deploy
 ```
 
-After deployment, create new triggers for the production version.
+デプロイ後、本番用のトリガーを再作成してください。
 
-## Project Structure
+## プロジェクト構造
 
 ```
 learn-logger/
 ├── datastores/
-│   ├── semesters_datastore.ts   # Semester records (year, season, dates, status)
-│   ├── subjects_datastore.ts    # Subject records (name, credits, semester)
-│   └── progress_datastore.ts    # Per-subject progress (%, updated_at)
+│   ├── semesters_datastore.ts       # 学期データ（年度、学期、期間、ステータス）
+│   ├── subjects_datastore.ts        # 科目データ（科目名、単位数、学期ID）
+│   └── progress_datastore.ts        # 進捗データ（進捗率、更新日時）
 ├── functions/
-│   ├── create_semester_function.ts  # Create a new semester
-│   ├── add_subject_function.ts      # Add a subject to active semester
-│   ├── log_progress_function.ts     # Record progress via modal
-│   ├── view_progress_function.ts    # View all subjects' progress
-│   └── close_semester_function.ts   # Close active semester
+│   ├── run_learn_logger.ts          # メイン関数（メニュー表示・全操作のハンドラー）
+│   └── internals/
+│       ├── constants.ts             # コールバックID・アクションID定数
+│       └── datetime.ts              # 日付・経過率・プログレスバーユーティリティ
 ├── workflows/
-│   ├── semester_setup_workflow.ts
-│   ├── subject_setup_workflow.ts
-│   ├── log_progress_workflow.ts
-│   ├── view_progress_workflow.ts
-│   └── semester_close_workflow.ts
+│   └── learn_logger.ts              # 単一ワークフロー
 ├── triggers/
-│   ├── semester_setup_trigger.ts
-│   ├── subject_setup_trigger.ts
-│   ├── log_progress_trigger.ts
-│   ├── view_progress_trigger.ts
-│   └── semester_close_trigger.ts
-├── assets/
-│   └── default_new_app_icon.png
-├── manifest.ts          # App manifest
-├── slack.json           # SDK dependencies
-└── deno.jsonc           # Deno configuration
+│   └── learn_logger_trigger.ts      # 単一ショートカットトリガー
+├── manifest.ts                      # アプリマニフェスト
+├── slack.json                       # SDK 依存関係
+└── deno.jsonc                       # Deno 設定
 ```
 
-## Usage
+## 使い方
 
-1. **Create a semester** — Register year, season (spring/fall), start and end dates
-2. **Add subjects** — Register subjects with credit counts to the active semester
-3. **Log progress** — Select a subject and enter progress (0-100%)
-4. **View progress** — See all subjects with progress bars and weighted average
-5. **Close semester** — End the active semester with a final report
+1. ショートカット URL をクリックしてメインメニューを開く
+2. メニューから操作を選択して「選択」を押す
+3. 表示されたフォームで操作を実行
+4. 各画面の「← ホームに戻る」ボタンでメインメニューに戻れます
 
-## How It Works
+### メッセージの送信先
 
-- **Elapsed time rate**: Calculates `(today - start_date) / (end_date - start_date) * 100` in JST
-- **Progress comparison**: Shows the difference between your progress and elapsed time
-- **Weighted average**: Uses credit counts to calculate overall progress across subjects
-- **Visual feedback**: Progress bars and status indicators (ahead / on track / behind)
+| 操作 | 送信先 |
+|---|---|
+| 学期を作成する | 実行チャンネル |
+| 進捗を記録する | 実行チャンネル |
+| 学期を終了する | 実行チャンネル |
+| 科目を追加する / 管理する / 進捗を確認する | 実行者の DM |
 
-## Bot Scopes
+## 仕組み
 
-- `datastore:read` — Read stored data
-- `datastore:write` — Save data
-- `commands` — Handle slash commands
-- `chat:write` — Send messages
-- `chat:write.public` — Send messages in public channels
+- **経過時間率**: `(今日 - 開始日) / (終了日 - 開始日) × 100`（JST基準）
+- **進捗比較**: 進捗率と経過時間率の差分を表示
+- **加重平均**: 単位数で重み付けした全体進捗を算出
+- **視覚表示**: プログレスバーとステータス（順調 / 予定通り / 遅れ）
 
-## Testing
+## Bot スコープ
+
+| スコープ | 用途 |
+|---|---|
+| `commands` | ショートカットの処理 |
+| `chat:write` | メッセージ送信（DM含む） |
+| `chat:write.public` | パブリックチャンネルへのメッセージ送信 |
+| `datastore:read` | データストアの読み取り |
+| `datastore:write` | データストアへの書き込み |
+
+## テスト
 
 ```bash
 deno task test
 ```
 
-## License
+## ライセンス
 
-MIT License — see the [LICENSE](LICENSE) file for details.
+MIT License — 詳細は [LICENSE](LICENSE) を参照してください。
 
-## Resources
+## 参考リンク
 
-- [Slack Automation Platform](https://api.slack.com/automation)
-- [Deno Slack SDK Documentation](https://api.slack.com/automation/quickstart)
-- [Datastores Guide](https://api.slack.com/automation/datastores)
+- [Slack オートメーションプラットフォーム](https://api.slack.com/automation)
+- [Deno Slack SDK ドキュメント](https://api.slack.com/automation/quickstart)
+- [データストアガイド](https://api.slack.com/automation/datastores)
