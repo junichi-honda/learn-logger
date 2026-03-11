@@ -5,63 +5,96 @@
 
 *他の言語で読む: [English](README.md)*
 
-このSlackアプリは、学習の進捗率を記録して経過日数と比較するためのツールです。
+学期・科目単位で学習の進捗率を記録し、経過時間と比較する Slack アプリです。
 
-**主な機能**:
+## 機能
 
-- 学習の進捗率（%）をフォームから入力して記録
-- 学習期間の経過日数を自動計算（2025/4/1からの経過日数と総日数129日の比率）
-- 進捗率と経過日数率を比較して評価するメッセージを表示
+- 学期の作成・管理（年度、学期区分、開始日・終了日）
+- 科目の登録（科目名、単位数）
+- 科目ごとの進捗率（%）をモーダルから記録
+- 全科目の進捗一覧表示（単位数による加重平均つき）
+- 進捗率と経過時間率の比較（プログレスバーで視覚表示）
+- 学期の終了と最終レポート生成
+
+## 前提条件
+
+- [Slack CLI](https://api.slack.com/automation/quickstart) がインストール済み
+- 有料プランの Slack ワークスペース
+- Deno ランタイム
 
 ## セットアップ
 
-### Slack CLIのインストール
-
-このテンプレートを使用するには、Slack CLIをインストールして設定する必要があります。
-詳細なインストール手順は[クイックスタートガイド](https://api.slack.com/automation/quickstart)をご覧ください。
-
 ### ローカルでの実行
 
-開発中は、`slack run`コマンドを使用して変更をリアルタイムでワークスペースに反映できます。
-
-```zsh
-# アプリをローカルで実行
-$ slack run
-
-Connected, awaiting events
+```bash
+slack run
 ```
 
-ローカル実行を停止するには、`<CTRL> + C`でプロセスを終了します。
+`<CTRL> + C` で停止します。
 
-## トリガーの作成
+### トリガーの作成
 
-アプリを使用するには、トリガーを作成する必要があります。トリガーを手動で作成するには、以下のコマンドを使用します：
+各ワークフローのトリガーを作成します：
 
-```zsh
-$ slack trigger create --trigger-def triggers/sample_trigger.ts
+```bash
+slack trigger create --trigger-def triggers/semester_setup_trigger.ts
+slack trigger create --trigger-def triggers/subject_setup_trigger.ts
+slack trigger create --trigger-def triggers/log_progress_trigger.ts
+slack trigger create --trigger-def triggers/view_progress_trigger.ts
+slack trigger create --trigger-def triggers/semester_close_trigger.ts
 ```
 
-## デプロイ
+各コマンドでショートカット URL が発行されます。
 
-開発が完了したら、`slack deploy`コマンドでアプリをSlackインフラストラクチャにデプロイします：
+### デプロイ
 
-```zsh
-$ slack deploy
+```bash
+slack deploy
 ```
+
+デプロイ後、本番用のトリガーを再作成してください。
 
 ## プロジェクト構造
 
-- `datastores/`: データ保存用のデータストア
-- `functions/`: アプリのビジネスロジックを含む関数
-- `triggers/`: ワークフローの起動条件を定義
-- `workflows/`: ユーザーの入力を受け付け、関数を実行するワークフロー
-- `manifest.ts`: アプリの設定を含むマニフェストファイル
+```
+learn-logger/
+├── datastores/
+│   ├── semesters_datastore.ts   # 学期データ（年度、学期、期間、ステータス）
+│   ├── subjects_datastore.ts    # 科目データ（科目名、単位数、学期ID）
+│   └── progress_datastore.ts    # 進捗データ（進捗率、更新日時）
+├── functions/
+│   ├── create_semester_function.ts  # 学期作成
+│   ├── add_subject_function.ts      # 科目追加
+│   ├── log_progress_function.ts     # 進捗記録（モーダル）
+│   ├── view_progress_function.ts    # 進捗一覧表示
+│   └── close_semester_function.ts   # 学期終了
+├── workflows/                   # ワークフロー定義
+├── triggers/                    # ショートカットトリガー定義
+├── manifest.ts                  # アプリマニフェスト
+├── slack.json                   # SDK 依存関係
+└── deno.jsonc                   # Deno 設定
+```
 
 ## 使い方
 
-1. Slackで提供されるショートカットURLをクリックしてアプリを起動
-2. フォームに学習の進捗率（%）を入力
-3. 送信すると、進捗率と経過日数の比較結果がメッセージとして表示されます
+1. **学期を作成する** — 年度、学期区分（春/秋）、開始日・終了日を登録
+2. **科目を追加する** — アクティブな学期に科目名と単位数を登録
+3. **進捗を記録する** — 科目を選んで進捗率（0〜100%）を入力
+4. **進捗を確認する** — 全科目の進捗をプログレスバー付きで一覧表示
+5. **学期を終了する** — アクティブな学期を終了し最終レポートを表示
+
+## 仕組み
+
+- **経過時間率**: `(今日 - 開始日) / (終了日 - 開始日) × 100`（JST）
+- **進捗比較**: 進捗率と経過時間率の差分を表示
+- **加重平均**: 単位数で重み付けした全体進捗を算出
+- **視覚表示**: プログレスバーとステータス（順調 / 予定通り / 遅れ）
+
+## テスト
+
+```bash
+deno task test
+```
 
 ## License
 

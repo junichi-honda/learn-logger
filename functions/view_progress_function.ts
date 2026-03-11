@@ -78,7 +78,7 @@ export default SlackFunction(
     >({
       datastore: SemestersDatastore.definition.name,
       expression: "user_id = :uid",
-      expression_attributes: { ":uid": inputs.user_id },
+      expression_values: { ":uid": inputs.user_id },
     });
 
     if (!semestersRes.ok || semestersRes.items.length === 0) {
@@ -153,7 +153,7 @@ export default SlackFunction(
     >({
       datastore: SubjectsDatastore.definition.name,
       expression: "semester_id = :sid",
-      expression_attributes: { ":sid": semesterValue.semester_id },
+      expression_values: { ":sid": semesterValue.semester_id },
     });
 
     if (!subjectsRes.ok || subjectsRes.items.length === 0) {
@@ -172,7 +172,7 @@ export default SlackFunction(
     >({
       datastore: ProgressDatastore.definition.name,
       expression: "user_id = :uid",
-      expression_attributes: { ":uid": body.user.id },
+      expression_values: { ":uid": body.user.id },
     });
 
     const progressMap = new Map(

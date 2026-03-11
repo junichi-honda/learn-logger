@@ -21,36 +21,9 @@ const SubjectSetupWorkflow = DefineWorkflow({
   },
 });
 
-const inputForm = SubjectSetupWorkflow.addStep(
-  Schema.slack.functions.OpenForm,
-  {
-    title: "科目を追加する",
-    interactivity: SubjectSetupWorkflow.inputs.interactivity,
-    submit_label: "追加",
-    fields: {
-      elements: [
-        {
-          name: "subject_name",
-          title: "科目名",
-          type: Schema.types.string,
-        },
-        {
-          name: "credits",
-          title: "単位数",
-          type: Schema.types.number,
-          minimum: 1,
-          maximum: 20,
-        },
-      ],
-      required: ["subject_name", "credits"],
-    },
-  },
-);
-
 const addStep = SubjectSetupWorkflow.addStep(AddSubjectFunction, {
+  interactivity: SubjectSetupWorkflow.inputs.interactivity,
   user_id: SubjectSetupWorkflow.inputs.user,
-  subject_name: inputForm.outputs.fields.subject_name,
-  credits: inputForm.outputs.fields.credits,
 });
 
 SubjectSetupWorkflow.addStep(Schema.slack.functions.SendMessage, {

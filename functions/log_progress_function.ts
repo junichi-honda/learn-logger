@@ -78,11 +78,11 @@ export default SlackFunction(
     >({
       datastore: SemestersDatastore.definition.name,
       expression: "user_id = :uid AND #s = :active",
-      expression_attributes: {
+      expression_attributes: { "#s": "status" },
+      expression_values: {
         ":uid": inputs.user_id,
         ":active": "active",
       },
-      expression_attribute_names: { "#s": "status" },
     });
 
     if (!semesterRes.ok || semesterRes.items.length === 0) {
@@ -100,7 +100,7 @@ export default SlackFunction(
     >({
       datastore: SubjectsDatastore.definition.name,
       expression: "semester_id = :sid",
-      expression_attributes: { ":sid": semester.semester_id },
+      expression_values: { ":sid": semester.semester_id },
     });
 
     if (!subjectsRes.ok || subjectsRes.items.length === 0) {

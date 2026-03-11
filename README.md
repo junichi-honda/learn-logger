@@ -5,19 +5,20 @@
 
 *Read this in other languages: [日本語](README.ja.md)*
 
-A Slack app for tracking learning progress and comparing it against elapsed time.
+A Slack app for tracking learning progress per subject and comparing it against elapsed time in a semester.
 
 ## Overview
 
-This Slack automation app helps you track your learning progress by recording completion percentages and comparing them with elapsed time to keep you on track with your goals.
+This Slack automation app helps you manage semesters, register subjects with credits, record per-subject progress percentages, and compare them with elapsed time to keep you on track with your goals.
 
 ## Features
 
-- Record learning progress (%) through an interactive form
-- Automatically calculate elapsed days (from April 1, 2025)
-- Compare progress rate vs. time elapsed (total: 129 days)
-- Display evaluation messages based on progress comparison
-- Persistent data storage using Slack datastores
+- Create and manage semesters (year, season, start/end dates)
+- Register subjects with credit weights per semester
+- Record per-subject learning progress (%) through interactive modals
+- View all subjects' progress with weighted average calculation
+- Compare progress rate vs. elapsed time with visual progress bars
+- Close semesters with a final summary report
 
 ## Prerequisites
 
@@ -31,7 +32,7 @@ This Slack automation app helps you track your learning progress by recording co
 
 ```bash
 # Clone this project
-git clone https://github.com/your-repo/learn-logger.git
+git clone https://github.com/jhonda/learn-logger.git
 
 # Change into the project directory
 cd learn-logger
@@ -39,132 +40,102 @@ cd learn-logger
 
 ### Running Locally
 
-Run the app locally with real-time updates:
-
 ```bash
-# Start the local development server
 slack run
 ```
 
 Your app will have `(local)` appended to its name. Press `<CTRL> + C` to stop.
 
-### Create a Trigger
+### Create Triggers
 
-To use the app, create a trigger manually:
+Create triggers for each workflow:
 
 ```bash
-slack trigger create --trigger-def triggers/sample_trigger.ts
+slack trigger create --trigger-def triggers/semester_setup_trigger.ts
+slack trigger create --trigger-def triggers/subject_setup_trigger.ts
+slack trigger create --trigger-def triggers/log_progress_trigger.ts
+slack trigger create --trigger-def triggers/view_progress_trigger.ts
+slack trigger create --trigger-def triggers/semester_close_trigger.ts
 ```
 
-This will generate a Shortcut URL. Click the link in Slack to launch the app.
+Each command generates a Shortcut URL. Share the links in Slack to use the app.
 
 ### Deploying to Production
-
-Deploy to Slack infrastructure:
 
 ```bash
 slack deploy
 ```
 
-After deployment, create a new trigger for the production version.
-
-## Configuration
-
-### Environment Variables
-
-No environment variables are required for basic functionality.
-
-### Secrets
-
-Authentication is managed automatically through the Slack CLI.
+After deployment, create new triggers for the production version.
 
 ## Project Structure
 
 ```
 learn-logger/
-├── datastores/          # Datastore definitions for persistent storage
-│   └── sample_datastore.ts
-├── functions/           # Business logic functions
-│   └── sample_function.ts
-├── triggers/            # Workflow trigger definitions
-│   └── sample_trigger.ts
-├── workflows/           # Workflow definitions
-│   └── sample_workflow.ts
-├── assets/              # Static assets
+├── datastores/
+│   ├── semesters_datastore.ts   # Semester records (year, season, dates, status)
+│   ├── subjects_datastore.ts    # Subject records (name, credits, semester)
+│   └── progress_datastore.ts    # Per-subject progress (%, updated_at)
+├── functions/
+│   ├── create_semester_function.ts  # Create a new semester
+│   ├── add_subject_function.ts      # Add a subject to active semester
+│   ├── log_progress_function.ts     # Record progress via modal
+│   ├── view_progress_function.ts    # View all subjects' progress
+│   └── close_semester_function.ts   # Close active semester
+├── workflows/
+│   ├── semester_setup_workflow.ts
+│   ├── subject_setup_workflow.ts
+│   ├── log_progress_workflow.ts
+│   ├── view_progress_workflow.ts
+│   └── semester_close_workflow.ts
+├── triggers/
+│   ├── semester_setup_trigger.ts
+│   ├── subject_setup_trigger.ts
+│   ├── log_progress_trigger.ts
+│   ├── view_progress_trigger.ts
+│   └── semester_close_trigger.ts
+├── assets/
 │   └── default_new_app_icon.png
-├── manifest.ts          # App manifest with configuration
+├── manifest.ts          # App manifest
 ├── slack.json           # SDK dependencies
-├── deno.jsonc           # Deno configuration
-└── import_map.json      # Import mappings
+└── deno.jsonc           # Deno configuration
 ```
 
-### Key Components
+## Usage
 
-- **Datastores**: Store learning progress data securely on Slack infrastructure
-- **Functions**: Calculate progress rates and elapsed time percentages
-- **Workflows**: Handle user input and orchestrate function execution
-- **Triggers**: Define when and how workflows are invoked
+1. **Create a semester** — Register year, season (spring/fall), start and end dates
+2. **Add subjects** — Register subjects with credit counts to the active semester
+3. **Log progress** — Select a subject and enter progress (0-100%)
+4. **View progress** — See all subjects with progress bars and weighted average
+5. **Close semester** — End the active semester with a final report
+
+## How It Works
+
+- **Elapsed time rate**: Calculates `(today - start_date) / (end_date - start_date) * 100` in JST
+- **Progress comparison**: Shows the difference between your progress and elapsed time
+- **Weighted average**: Uses credit counts to calculate overall progress across subjects
+- **Visual feedback**: Progress bars and status indicators (ahead / on track / behind)
+
+## Bot Scopes
+
+- `datastore:read` — Read stored data
+- `datastore:write` — Save data
+- `commands` — Handle slash commands
+- `chat:write` — Send messages
+- `chat:write.public` — Send messages in public channels
 
 ## Testing
-
-Run tests using Deno:
-
-```bash
-deno test
-```
-
-Or use the configured task:
 
 ```bash
 deno task test
 ```
 
-This will run formatting checks, linting, and tests.
-
-## Usage
-
-1. Click the Shortcut URL in Slack to launch the app
-2. Enter your learning progress (%) in the form
-3. Submit the form
-4. View the comparison message showing:
-   - Your progress percentage
-   - Elapsed time percentage
-   - Evaluation message
-
-## How It Works
-
-The app calculates:
-- **Elapsed Days**: Days from April 1, 2025 to today
-- **Time Ratio**: Elapsed days / 129 total days
-- **Progress Comparison**: Your progress % vs. time ratio
-
-You'll receive feedback on whether you're ahead of schedule or need to catch up.
-
-## Datastore Scopes
-
-This app requires the following scopes:
-- `datastore:read` - Read stored learning progress
-- `datastore:write` - Save new learning progress entries
-- `commands` - Handle slash commands
-- `chat:write` - Send messages
-- `chat:write.public` - Send messages in public channels
-
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License — see the [LICENSE](LICENSE) file for details.
 
 ## Resources
 
 - [Slack Automation Platform](https://api.slack.com/automation)
 - [Deno Slack SDK Documentation](https://api.slack.com/automation/quickstart)
 - [Datastores Guide](https://api.slack.com/automation/datastores)
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
----
-
-**Created by**: jhonda  
-**Repository**: [learn-logger](https://github.com/jhonda/repository/learn-logger)
-

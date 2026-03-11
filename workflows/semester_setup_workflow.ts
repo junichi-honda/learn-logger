@@ -21,51 +21,10 @@ const SemesterSetupWorkflow = DefineWorkflow({
   },
 });
 
-const inputForm = SemesterSetupWorkflow.addStep(
-  Schema.slack.functions.OpenForm,
-  {
-    title: "学期を登録する",
-    interactivity: SemesterSetupWorkflow.inputs.interactivity,
-    submit_label: "登録",
-    fields: {
-      elements: [
-        {
-          name: "year",
-          title: "年度 (例: 2025)",
-          type: Schema.types.number,
-        },
-        {
-          name: "season",
-          title: "学期",
-          type: Schema.types.string,
-          enum: ["春", "秋"],
-          choices: [
-            { value: "春", title: "春学期" },
-            { value: "秋", title: "秋学期" },
-          ],
-        },
-        {
-          name: "start_date",
-          title: "開始日 (YYYY-MM-DD)",
-          type: Schema.types.string,
-        },
-        {
-          name: "end_date",
-          title: "終了日 (YYYY-MM-DD)",
-          type: Schema.types.string,
-        },
-      ],
-      required: ["year", "season", "start_date", "end_date"],
-    },
-  },
-);
-
 const createStep = SemesterSetupWorkflow.addStep(CreateSemesterFunction, {
+  interactivity: SemesterSetupWorkflow.inputs.interactivity,
   user_id: SemesterSetupWorkflow.inputs.user,
-  year: inputForm.outputs.fields.year,
-  season: inputForm.outputs.fields.season,
-  start_date: inputForm.outputs.fields.start_date,
-  end_date: inputForm.outputs.fields.end_date,
+  channel: SemesterSetupWorkflow.inputs.channel,
 });
 
 SemesterSetupWorkflow.addStep(Schema.slack.functions.SendMessage, {
