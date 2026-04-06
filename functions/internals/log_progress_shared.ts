@@ -227,10 +227,12 @@ export async function handleLogProgressSubmission(
 
 // ----- Summary message -----
 
-export function buildLogProgressSummary(
+export async function buildLogProgressSummary(
   metadata: LogProgressMeta,
-): string | null {
-  const { logged_subjects } = metadata;
+  // deno-lint-ignore no-explicit-any
+  client: any,
+): Promise<string | null> {
+  const { logged_subjects, all_subjects } = metadata;
   if (logged_subjects.length === 0) return null;
 
   const elapsedRate = calcElapsedRate(
@@ -248,11 +250,27 @@ export function buildLogProgressSummary(
     )
     .join("\n");
 
-  const totalCredits = logged_subjects.reduce((sum, s) => sum + s.credits, 0);
+  // 全科目の進捗を DB から取得して全体の加重平均を計算
+  const subjectIds = new Set(all_subjects.map((s) => s.subject_id));
+  const progressRes = await client.apps.datastore.query({
+    datastore: ProgressDatastore.definition.name,
+  });
+  const progressMap = new Map<string, number>();
+  for (const p of progressRes.items ?? []) {
+    if (subjectIds.has(p.subject_id as string)) {
+      progressMap.set(p.subject_id as string, p.progress_pct as number);
+    }
+  }
+  // 今回記録した分を上書き（DB 書き込み済みだが念のため）
+  for (const s of logged_subjects) {
+    progressMap.set(s.subject_id, s.progress_pct);
+  }
+
+  const totalCredits = all_subjects.reduce((sum, s) => sum + s.credits, 0);
   const weightedProgress = totalCredits > 0
     ? round1(
-      logged_subjects.reduce(
-        (sum, s) => sum + s.credits * s.progress_pct,
+      all_subjects.reduce(
+        (sum, s) => sum + s.credits * (progressMap.get(s.subject_id) ?? 0),
         0,
       ) / totalCredits,
     )
@@ -269,7 +287,7 @@ export function buildLogProgressSummary(
     `\u2705 ${logged_subjects.length}\u79D1\u76EE\u306E\u9032\u6357\u3092\u8A18\u9332\u3057\u307E\u3057\u305F\uFF08${today}\uFF09\n` +
     `\uD83D\uDCC5 ${metadata.semester_year}\u5E74 ${metadata.semester_season}\u5B66\u671F\n\n` +
     `${subjectLines}\n\n` +
-    `\u52A0\u91CD\u5E73\u5747: ${weightedProgress}% ${
+    `\u5168\u4F53\u9032\u6357: ${weightedProgress}% ${
       renderBar(weightedProgress)
     }\n` +
     `\u7D4C\u904E\u6642\u9593: ${elapsedRate}% ${renderBar(elapsedRate)}\n` +

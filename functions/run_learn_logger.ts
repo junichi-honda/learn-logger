@@ -1070,7 +1070,7 @@ export default SlackFunction(def, async ({ inputs, client }) => {
     CallbackId.LogProgress,
     async ({ view, body, client }) => {
       const metadata: LogProgressMeta = JSON.parse(view.private_metadata!);
-      const msg = buildLogProgressSummary(metadata);
+      const msg = await buildLogProgressSummary(metadata, client);
       if (msg) {
         await client.chat.postMessage({ channel: metadata.channel, text: msg });
       }
