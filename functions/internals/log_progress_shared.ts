@@ -285,7 +285,7 @@ export async function buildLogProgressSummary(
 
   return (
     `\u2705 ${logged_subjects.length}\u79D1\u76EE\u306E\u9032\u6357\u3092\u8A18\u9332\u3057\u307E\u3057\u305F\uFF08${today}\uFF09\n` +
-    `\uD83D\uDCC5 ${metadata.semester_year}\u5E74 ${metadata.semester_season}\u5B66\u671F\n\n` +
+    `\uD83D\uDCC5 ${metadata.semester_year}\u5E74 ${metadata.semester_season}\u5B66\u671F\uFF08${metadata.semester_start} \u301C ${metadata.semester_end}\uFF09\n\n` +
     `${subjectLines}\n\n` +
     `\u5168\u4F53\u9032\u6357: ${weightedProgress}% ${
       renderBar(weightedProgress)
