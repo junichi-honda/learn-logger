@@ -7,6 +7,7 @@ export const CallbackId = {
   ViewProgress: "view_progress_modal",
   CloseSemester: "close_semester_modal",
   InfoView: "info_view",
+  LogProgressStandalone: "log_progress_standalone",
 } as const;
 
 export const ActionId = {

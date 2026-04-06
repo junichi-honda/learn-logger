@@ -1,13 +1,13 @@
 import type { Trigger } from "deno-slack-sdk/types.ts";
 import { TriggerContextData, TriggerTypes } from "deno-slack-api/mod.ts";
-import LearnLoggerWorkflow from "../workflows/learn_logger.ts";
+import LogProgressWorkflow from "../workflows/log_progress.ts";
 
-const learnLoggerTrigger: Trigger<typeof LearnLoggerWorkflow.definition> = {
+const logProgressTrigger: Trigger<typeof LogProgressWorkflow.definition> = {
   type: TriggerTypes.Shortcut,
-  name: "Learn Logger",
+  name: "\u9032\u6357\u3092\u8A18\u9332\u3059\u308B",
   description:
-    "\u5B66\u671F\u30FB\u79D1\u76EE\u306E\u7BA1\u7406\u3068\u5B66\u7FD2\u9032\u6357\u306E\u8A18\u9332\u30FB\u78BA\u8A8D",
-  workflow: `#/workflows/${LearnLoggerWorkflow.definition.callback_id}`,
+    "\u30A2\u30AF\u30C6\u30A3\u30D6\u306A\u5B66\u671F\u306E\u9032\u6357\u3092\u76F4\u63A5\u8A18\u9332\u3059\u308B",
+  workflow: `#/workflows/${LogProgressWorkflow.definition.callback_id}`,
   inputs: {
     interactivity: {
       value: TriggerContextData.Shortcut.interactivity,
@@ -21,4 +21,4 @@ const learnLoggerTrigger: Trigger<typeof LearnLoggerWorkflow.definition> = {
   },
 };
 
-export default learnLoggerTrigger;
+export default logProgressTrigger;
