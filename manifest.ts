@@ -1,5 +1,6 @@
 import { Manifest } from "deno-slack-sdk/mod.ts";
 import LearnLoggerWorkflow from "./workflows/learn_logger.ts";
+import LogProgressWorkflow from "./workflows/log_progress.ts";
 import SemestersDatastore from "./datastores/semesters_datastore.ts";
 import SubjectsDatastore from "./datastores/subjects_datastore.ts";
 import ProgressDatastore from "./datastores/progress_datastore.ts";
@@ -9,7 +10,7 @@ export default Manifest({
   displayName: "learn logger",
   description: "learn logger",
   icon: "assets/default_new_app_icon.png",
-  workflows: [LearnLoggerWorkflow],
+  workflows: [LearnLoggerWorkflow, LogProgressWorkflow],
   outgoingDomains: [],
   datastores: [
     SemestersDatastore,
