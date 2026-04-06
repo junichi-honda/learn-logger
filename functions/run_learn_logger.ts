@@ -442,7 +442,33 @@ function buildManageEditView(metadata: ManageSubjectMeta) {
 function buildViewProgressView(
   channel: string,
   semesters: Array<Record<string, unknown>>,
+  activeSemesterId?: string,
 ) {
+  const options = semesters.map((s) => {
+    const statusLabel = s.status === "active"
+      ? "\u9032\u884C\u4E2D"
+      : "\u7D42\u4E86";
+    return {
+      text: {
+        type: "plain_text" as const,
+        text: `${s.year}\u5E74 ${s.season}\u5B66\u671F [${statusLabel}]`,
+      },
+      value: JSON.stringify({
+        semester_id: s.semester_id,
+        year: s.year,
+        season: s.season,
+        start_date: s.start_date,
+        end_date: s.end_date,
+        status: s.status,
+      }),
+    };
+  });
+  const initialOption = activeSemesterId
+    ? options.find((o) => {
+      const parsed = JSON.parse(o.value);
+      return parsed.semester_id === activeSemesterId;
+    })
+    : undefined;
   return {
     type: "modal" as const,
     callback_id: CallbackId.ViewProgress,
@@ -470,26 +496,8 @@ function buildViewProgressView(
             type: "plain_text",
             text: "\u5B66\u671F\u3092\u9078\u629E...",
           },
-          options: semesters.map((s) => {
-            const statusLabel = s.status === "active"
-              ? "\u9032\u884C\u4E2D"
-              : "\u7D42\u4E86";
-            return {
-              text: {
-                type: "plain_text" as const,
-                text:
-                  `${s.year}\u5E74 ${s.season}\u5B66\u671F [${statusLabel}]`,
-              },
-              value: JSON.stringify({
-                semester_id: s.semester_id,
-                year: s.year,
-                season: s.season,
-                start_date: s.start_date,
-                end_date: s.end_date,
-                status: s.status,
-              }),
-            };
-          }),
+          options,
+          ...(initialOption ? { initial_option: initialOption } : {}),
         },
       },
     ],
@@ -705,7 +713,12 @@ export default SlackFunction(def, async ({ inputs, client }) => {
           );
           return {
             response_action: "update" as const,
-            view: buildViewProgressView(channel, semesters),
+            view: buildViewProgressView(
+              channel,
+              semesters,
+              (semesters.find((s) => s.status === "active")
+                ?.semester_id) as string | undefined,
+            ),
           };
         }
 
