@@ -13,6 +13,7 @@ import { completeQuietly, fetchActiveSemester } from "./internals/helpers.ts";
 import {
   buildLogProgressSummary,
   buildLogProgressView,
+  handleLogProgressAndFinish,
   handleLogProgressSubmission,
   type LogProgressMeta,
 } from "./internals/log_progress_shared.ts";
@@ -1135,9 +1136,14 @@ export default SlackFunction(def, async ({ inputs, client }) => {
     CallbackId.LogProgress,
     async ({ view, body, client }) => {
       const metadata: LogProgressMeta = JSON.parse(view.private_metadata!);
-      const msg = await buildLogProgressSummary(metadata, client);
-      if (msg) {
-        await client.chat.postMessage({ channel: metadata.channel, text: msg });
+      if (!metadata.finished) {
+        const msg = await buildLogProgressSummary(metadata, client);
+        if (msg) {
+          await client.chat.postMessage({
+            channel: metadata.channel,
+            text: msg,
+          });
+        }
       }
       await completeQuietly(client, body.function_data.execution_id);
     },
@@ -1356,6 +1362,14 @@ export default SlackFunction(def, async ({ inputs, client }) => {
   )
   // ----- Back to Home -----
 
+  .addBlockActionsHandler(
+    ActionId.LogProgressAndFinish,
+    async ({ body, client }) => {
+      await handleLogProgressAndFinish(client, body.user.id, body, {
+        includeHomeButton: true,
+      });
+    },
+  )
   .addBlockActionsHandler(
     ActionId.BackToHome,
     async ({ body, client }) => {

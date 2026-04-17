@@ -1,5 +1,5 @@
 import ProgressDatastore from "../../datastores/progress_datastore.ts";
-import { CallbackId } from "./constants.ts";
+import { ActionId, CallbackId } from "./constants.ts";
 import { calcElapsedRate, getJstToday, renderBar, round1 } from "./datetime.ts";
 
 // ----- Types -----
@@ -18,6 +18,7 @@ export interface LogProgressMeta {
     progress_pct: number;
   }>;
   form_seq: number;
+  finished?: boolean;
   all_subjects: Array<{
     subject_id: string;
     subject_name: string;
@@ -109,7 +110,7 @@ export function buildLogProgressView(
         type: "plain_text" as const,
         text: "\u9032\u6357\u3092\u8A18\u9332\u3059\u308B",
       },
-      close: { type: "plain_text" as const, text: "\u5B8C\u4E86" },
+      close: { type: "plain_text" as const, text: "\u9589\u3058\u308B" },
       blocks,
     };
   }
@@ -153,6 +154,21 @@ export function buildLogProgressView(
     },
   });
 
+  blocks.push({
+    type: "actions",
+    block_id: "finish_action_block",
+    elements: [
+      {
+        type: "button",
+        action_id: ActionId.LogProgressAndFinish,
+        text: {
+          type: "plain_text",
+          text: "\u8A18\u9332\u3057\u3066\u7D42\u4E86",
+        },
+      },
+    ],
+  });
+
   return {
     type: "modal" as const,
     callback_id: CallbackId.LogProgress,
@@ -162,8 +178,14 @@ export function buildLogProgressView(
       type: "plain_text" as const,
       text: "\u9032\u6357\u3092\u8A18\u9332\u3059\u308B",
     },
-    submit: { type: "plain_text" as const, text: "\u8A18\u9332" },
-    close: { type: "plain_text" as const, text: "\u5B8C\u4E86" },
+    submit: {
+      type: "plain_text" as const,
+      text: "\u8A18\u9332\u3057\u3066\u6B21\u3078",
+    },
+    close: {
+      type: "plain_text" as const,
+      text: "\u30AD\u30E3\u30F3\u30BB\u30EB",
+    },
     blocks,
   };
 }
@@ -223,6 +245,185 @@ export async function handleLogProgressSubmission(
     response_action: "update" as const,
     view: buildLogProgressView(metadata, viewOptions),
   };
+}
+
+// ----- Record and finish handler -----
+
+export async function handleLogProgressAndFinish(
+  // deno-lint-ignore no-explicit-any
+  client: any,
+  userId: string,
+  // deno-lint-ignore no-explicit-any
+  body: any,
+  viewOptions?: { includeHomeButton?: boolean },
+): Promise<void> {
+  const metadata: LogProgressMeta = JSON.parse(body.view.private_metadata);
+  const seq = metadata.form_seq;
+  // deno-lint-ignore no-explicit-any
+  const state = body.view.state as any;
+
+  const subjectBlock = state.values[`subject_block_${seq}`];
+  const progressBlock = state.values[`progress_block_${seq}`];
+
+  if (
+    !subjectBlock?.subject_select?.selected_option?.value ||
+    !progressBlock?.progress_input?.value
+  ) {
+    const includeHome = viewOptions?.includeHomeButton ?? true;
+    const warningMeta = { ...metadata };
+    const warningBlocks: Record<string, unknown>[] = [];
+    if (includeHome) warningBlocks.push(homeButtonBlock());
+
+    const loggedIds = new Set(
+      warningMeta.logged_subjects.map((s) => s.subject_id),
+    );
+    const remaining = warningMeta.all_subjects.filter(
+      (s) => !loggedIds.has(s.subject_id),
+    );
+
+    warningBlocks.push({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text:
+          "\u26A0\uFE0F \u79D1\u76EE\u3068\u9032\u6357\u7387\u3092\u5165\u529B\u3057\u3066\u304B\u3089\u62BC\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
+      },
+    });
+    warningBlocks.push({ type: "divider" });
+    warningBlocks.push({
+      type: "input",
+      block_id: `subject_block_${seq}`,
+      label: { type: "plain_text", text: "\u79D1\u76EE" },
+      element: {
+        type: "static_select",
+        action_id: "subject_select",
+        placeholder: {
+          type: "plain_text",
+          text: "\u79D1\u76EE\u3092\u9078\u629E...",
+        },
+        options: remaining.map((s) => ({
+          text: {
+            type: "plain_text" as const,
+            text: `${s.subject_name} (${s.credits}\u5358\u4F4D)`,
+          },
+          value: JSON.stringify({
+            subject_id: s.subject_id,
+            subject_name: s.subject_name,
+            credits: s.credits,
+          }),
+        })),
+      },
+    });
+    warningBlocks.push({
+      type: "input",
+      block_id: `progress_block_${seq}`,
+      label: { type: "plain_text", text: "\u9032\u6357\u7387 (%)" },
+      element: {
+        type: "number_input",
+        action_id: "progress_input",
+        is_decimal_allowed: false,
+        min_value: "0",
+        max_value: "100",
+        placeholder: { type: "plain_text", text: "0\u301C100" },
+      },
+    });
+    warningBlocks.push({
+      type: "actions",
+      block_id: "finish_action_block",
+      elements: [
+        {
+          type: "button",
+          action_id: ActionId.LogProgressAndFinish,
+          text: {
+            type: "plain_text",
+            text: "\u8A18\u9332\u3057\u3066\u7D42\u4E86",
+          },
+        },
+      ],
+    });
+
+    await client.views.update({
+      view_id: body.view.id,
+      view: {
+        type: "modal" as const,
+        callback_id: CallbackId.LogProgress,
+        notify_on_close: true,
+        private_metadata: JSON.stringify(warningMeta),
+        title: {
+          type: "plain_text" as const,
+          text: "\u9032\u6357\u3092\u8A18\u9332\u3059\u308B",
+        },
+        submit: {
+          type: "plain_text" as const,
+          text: "\u8A18\u9332\u3057\u3066\u6B21\u3078",
+        },
+        close: {
+          type: "plain_text" as const,
+          text: "\u30AD\u30E3\u30F3\u30BB\u30EB",
+        },
+        blocks: warningBlocks,
+      },
+    });
+    return;
+  }
+
+  const subjectValue = JSON.parse(
+    subjectBlock.subject_select.selected_option.value,
+  );
+  const progressPct = Number(progressBlock.progress_input.value);
+
+  const putRes = await client.apps.datastore.put({
+    datastore: ProgressDatastore.definition.name,
+    item: {
+      subject_id: subjectValue.subject_id,
+      user_id: userId,
+      progress_pct: progressPct,
+      updated_at: new Date().toISOString(),
+    },
+  });
+
+  if (!putRes.ok) return;
+
+  metadata.logged_subjects.push({
+    subject_id: subjectValue.subject_id,
+    subject_name: subjectValue.subject_name,
+    credits: subjectValue.credits,
+    progress_pct: progressPct,
+  });
+  metadata.finished = true;
+
+  const msg = await buildLogProgressSummary(metadata, client);
+  if (msg) {
+    await client.chat.postMessage({ channel: metadata.channel, text: msg });
+  }
+
+  const includeHome = viewOptions?.includeHomeButton ?? true;
+  const doneBlocks: Record<string, unknown>[] = [];
+  if (includeHome) doneBlocks.push(homeButtonBlock());
+  doneBlocks.push({
+    type: "section",
+    text: {
+      type: "mrkdwn",
+      text:
+        "\u2705 \u8A18\u9332\u3092\u5B8C\u4E86\u3057\u307E\u3057\u305F\u3002\u30C1\u30E3\u30F3\u30CD\u30EB\u306B\u30B5\u30DE\u30EA\u30FC\u3092\u6295\u7A3F\u3057\u307E\u3057\u305F\u3002",
+    },
+  });
+
+  await client.views.update({
+    view_id: body.view.id,
+    view: {
+      type: "modal" as const,
+      callback_id: CallbackId.LogProgress,
+      notify_on_close: true,
+      private_metadata: JSON.stringify(metadata),
+      title: {
+        type: "plain_text" as const,
+        text: "\u9032\u6357\u3092\u8A18\u9332\u3059\u308B",
+      },
+      close: { type: "plain_text" as const, text: "\u9589\u3058\u308B" },
+      blocks: doneBlocks,
+    },
+  });
 }
 
 // ----- Summary message -----
