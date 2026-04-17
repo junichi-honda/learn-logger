@@ -39,8 +39,9 @@ interface ManageSubjectMeta {
   semester_id: string;
   semester_year: number;
   semester_season: string;
-  mode: "list" | "edit";
+  mode: "list" | "edit" | "confirm_delete";
   editing_subject?: SubjectItem;
+  deleting_subject?: SubjectItem;
   form_seq: number;
 }
 
@@ -433,6 +434,37 @@ function buildManageEditView(metadata: ManageSubjectMeta) {
             { text: { type: "plain_text", text: "1\u5358\u4F4D" }, value: "1" },
             { text: { type: "plain_text", text: "2\u5358\u4F4D" }, value: "2" },
           ],
+        },
+      },
+    ],
+  };
+}
+
+function buildConfirmDeleteView(metadata: ManageSubjectMeta) {
+  const { deleting_subject } = metadata;
+  if (!deleting_subject) throw new Error("No subject to delete");
+
+  return {
+    type: "modal" as const,
+    callback_id: CallbackId.ManageSubject,
+    notify_on_close: true,
+    private_metadata: JSON.stringify(metadata),
+    title: {
+      type: "plain_text" as const,
+      text: "\u524A\u9664\u306E\u78BA\u8A8D",
+    },
+    submit: { type: "plain_text" as const, text: "\u524A\u9664\u3059\u308B" },
+    close: {
+      type: "plain_text" as const,
+      text: "\u30AD\u30E3\u30F3\u30BB\u30EB",
+    },
+    blocks: [
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text:
+            `\u26A0\uFE0F \u79D1\u76EE\u300C*${deleting_subject.subject_name}*\u300D\uFF08${deleting_subject.credits}\u5358\u4F4D\uFF09\u3092\u524A\u9664\u3057\u307E\u3059\u304B\uFF1F\n\n\u8A18\u9332\u6E08\u307F\u306E\u9032\u6357\u30C7\u30FC\u30BF\u3082\u4E00\u7DD2\u306B\u524A\u9664\u3055\u308C\u307E\u3059\u3002\u3053\u306E\u64CD\u4F5C\u306F\u53D6\u308A\u6D88\u305B\u307E\u305B\u3093\u3002`,
         },
       },
     ],
@@ -956,41 +988,12 @@ export default SlackFunction(def, async ({ inputs, client }) => {
           values[`action_block_${seq}`].action_select.selected_option!.value;
 
         if (action === "delete") {
-          const delRes = await client.apps.datastore.delete<
-            typeof SubjectsDatastore.definition
-          >({
-            datastore: SubjectsDatastore.definition.name,
-            id: selectedSubject.subject_id,
-          });
-
-          if (!delRes.ok) {
-            return {
-              response_action: "errors" as const,
-              errors: {
-                [`subject_select_block_${seq}`]:
-                  `\u524A\u9664\u306B\u5931\u6557\u3057\u307E\u3057\u305F: ${delRes.error}`,
-              },
-            };
-          }
-
-          const subjects = await querySubjects(client, metadata.semester_id);
+          metadata.mode = "confirm_delete";
+          metadata.deleting_subject = selectedSubject;
           metadata.form_seq = seq + 1;
-          metadata.mode = "list";
-
-          if (subjects.length === 0) {
-            const msg =
-              `\uD83D\uDDD1\uFE0F \u79D1\u76EE\u300C${selectedSubject.subject_name}\u300D\u3092\u524A\u9664\u3057\u307E\u3057\u305F\u3002\n\u767B\u9332\u79D1\u76EE\u304C\u306A\u304F\u306A\u308A\u307E\u3057\u305F\u3002`;
-            await client.chat.postMessage({
-              channel: body.user.id,
-              text: msg,
-            });
-            await completeQuietly(client, body.function_data.execution_id);
-            return { response_action: "clear" as const };
-          }
-
           return {
             response_action: "update" as const,
-            view: buildManageListView(metadata, subjects),
+            view: buildConfirmDeleteView(metadata),
           };
         }
 
@@ -1051,6 +1054,55 @@ export default SlackFunction(def, async ({ inputs, client }) => {
         metadata.mode = "list";
         metadata.editing_subject = undefined;
         metadata.form_seq = seq + 1;
+
+        return {
+          response_action: "update" as const,
+          view: buildManageListView(metadata, subjects),
+        };
+      }
+
+      if (metadata.mode === "confirm_delete" && metadata.deleting_subject) {
+        const target = metadata.deleting_subject;
+
+        const delRes = await client.apps.datastore.delete<
+          typeof SubjectsDatastore.definition
+        >({
+          datastore: SubjectsDatastore.definition.name,
+          id: target.subject_id,
+        });
+
+        if (!delRes.ok) {
+          await client.chat.postMessage({
+            channel: body.user.id,
+            text:
+              `\u524A\u9664\u306B\u5931\u6557\u3057\u307E\u3057\u305F: ${delRes.error}`,
+          });
+          await completeQuietly(client, body.function_data.execution_id);
+          return { response_action: "clear" as const };
+        }
+
+        await client.apps.datastore.delete<
+          typeof ProgressDatastore.definition
+        >({
+          datastore: ProgressDatastore.definition.name,
+          id: target.subject_id,
+        });
+
+        await client.chat.postMessage({
+          channel: body.user.id,
+          text:
+            `\uD83D\uDDD1\uFE0F \u79D1\u76EE\u300C${target.subject_name}\u300D\u3068\u8A18\u9332\u6E08\u307F\u306E\u9032\u6357\u3092\u524A\u9664\u3057\u307E\u3057\u305F\u3002`,
+        });
+
+        const subjects = await querySubjects(client, metadata.semester_id);
+        metadata.mode = "list";
+        metadata.deleting_subject = undefined;
+        metadata.form_seq = (metadata.form_seq ?? 0) + 1;
+
+        if (subjects.length === 0) {
+          await completeQuietly(client, body.function_data.execution_id);
+          return { response_action: "clear" as const };
+        }
 
         return {
           response_action: "update" as const,
