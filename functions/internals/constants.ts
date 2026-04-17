@@ -12,6 +12,7 @@ export const CallbackId = {
 
 export const ActionId = {
   BackToHome: "back_to_home",
+  LogProgressAndFinish: "log_progress_and_finish",
 } as const;
 
 export const MenuAction = {

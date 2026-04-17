@@ -1,10 +1,11 @@
 import { DefineFunction, Schema, SlackFunction } from "deno-slack-sdk/mod.ts";
 import SubjectsDatastore from "../datastores/subjects_datastore.ts";
-import { CallbackId } from "./internals/constants.ts";
+import { ActionId, CallbackId } from "./internals/constants.ts";
 import { completeQuietly, fetchActiveSemester } from "./internals/helpers.ts";
 import {
   buildLogProgressSummary,
   buildLogProgressView,
+  handleLogProgressAndFinish,
   handleLogProgressSubmission,
   type LogProgressMeta,
 } from "./internals/log_progress_shared.ts";
@@ -116,7 +117,7 @@ export default SlackFunction(def, async ({ inputs, client }) => {
     [CallbackId.LogProgress, CallbackId.LogProgressStandalone],
     async ({ view, body, client }) => {
       const meta = JSON.parse(view.private_metadata!);
-      if (meta.logged_subjects) {
+      if (meta.logged_subjects && !meta.finished) {
         const msg = await buildLogProgressSummary(
           meta as LogProgressMeta,
           client,
@@ -126,5 +127,13 @@ export default SlackFunction(def, async ({ inputs, client }) => {
         }
       }
       await completeQuietly(client, body.function_data.execution_id);
+    },
+  )
+  .addBlockActionsHandler(
+    ActionId.LogProgressAndFinish,
+    async ({ body, client }) => {
+      await handleLogProgressAndFinish(client, body.user.id, body, {
+        includeHomeButton: false,
+      });
     },
   );
