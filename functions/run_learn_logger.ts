@@ -15,6 +15,7 @@ import {
   buildLogProgressView,
   handleLogProgressAndFinish,
   handleLogProgressSubmission,
+  handleSubjectSelectChange,
   type LogProgressMeta,
 } from "./internals/log_progress_shared.ts";
 
@@ -1368,6 +1369,12 @@ export default SlackFunction(def, async ({ inputs, client }) => {
       await handleLogProgressAndFinish(client, body.user.id, body, {
         includeHomeButton: true,
       });
+    },
+  )
+  .addBlockActionsHandler(
+    ActionId.SubjectSelect,
+    async ({ body, client }) => {
+      await handleSubjectSelectChange(client, body);
     },
   )
   .addBlockActionsHandler(
