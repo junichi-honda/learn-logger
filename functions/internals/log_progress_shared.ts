@@ -24,6 +24,11 @@ export interface LogProgressMeta {
     subject_name: string;
     credits: number;
   }>;
+  current_prefill?: {
+    subject_id: string;
+    progress_pct: number;
+    selected_value: string;
+  };
 }
 
 // ----- View builders -----
@@ -44,12 +49,91 @@ function homeButtonBlock() {
   };
 }
 
+function subjectBlockId(metadata: LogProgressMeta): string {
+  return `subject_block_${metadata.form_seq}`;
+}
+
+// views.update は同じ block_id + action_id の input の入力状態を引き継ぎ、
+// 新しい initial_value を無視する。プリフィル時に確実に値を反映させるため、
+// プリフィル対象の科目IDを block_id に含めて別ブロックとして描画させる。
+function progressBlockId(metadata: LogProgressMeta): string {
+  const suffix = metadata.current_prefill
+    ? `_${metadata.current_prefill.subject_id}`
+    : "";
+  return `progress_block_${metadata.form_seq}${suffix}`;
+}
+
+function buildSubjectProgressBlocks(
+  remaining: Array<
+    { subject_id: string; subject_name: string; credits: number }
+  >,
+  metadata: LogProgressMeta,
+  initialValues?: { selectedValue?: string; progressPct?: number },
+): Record<string, unknown>[] {
+  const options = remaining.map((s) => ({
+    text: {
+      type: "plain_text" as const,
+      text: `${s.subject_name} (${s.credits}単位)`,
+    },
+    value: JSON.stringify({
+      subject_id: s.subject_id,
+      subject_name: s.subject_name,
+      credits: s.credits,
+    }),
+  }));
+
+  const selectElement: Record<string, unknown> = {
+    type: "static_select",
+    action_id: "subject_select",
+    placeholder: {
+      type: "plain_text",
+      text: "科目を選択...",
+    },
+    options,
+  };
+  const initialOption = options.find(
+    (o) => o.value === initialValues?.selectedValue,
+  );
+  if (initialOption) selectElement.initial_option = initialOption;
+
+  const numberElement: Record<string, unknown> = {
+    type: "number_input",
+    action_id: "progress_input",
+    is_decimal_allowed: false,
+    min_value: "0",
+    max_value: "100",
+    placeholder: { type: "plain_text", text: "0〜100" },
+  };
+  if (initialValues?.progressPct !== undefined) {
+    numberElement.initial_value = String(initialValues.progressPct);
+  }
+
+  return [
+    {
+      type: "input",
+      block_id: subjectBlockId(metadata),
+      dispatch_action: true,
+      label: { type: "plain_text", text: "科目" },
+      element: selectElement,
+    },
+    {
+      type: "input",
+      block_id: progressBlockId(metadata),
+      label: { type: "plain_text", text: "進捗率 (%)" },
+      element: numberElement,
+    },
+  ];
+}
+
 export function buildLogProgressView(
   metadata: LogProgressMeta,
-  options?: { includeHomeButton?: boolean },
+  options?: {
+    includeHomeButton?: boolean;
+    initialValues?: { selectedValue?: string; progressPct?: number };
+  },
 ) {
   const includeHome = options?.includeHomeButton ?? true;
-  const { logged_subjects, all_subjects, form_seq } = metadata;
+  const { logged_subjects, all_subjects } = metadata;
   const blocks: Record<string, unknown>[] = [];
 
   if (includeHome) {
@@ -115,44 +199,9 @@ export function buildLogProgressView(
     };
   }
 
-  blocks.push({
-    type: "input",
-    block_id: `subject_block_${form_seq}`,
-    label: { type: "plain_text", text: "\u79D1\u76EE" },
-    element: {
-      type: "static_select",
-      action_id: "subject_select",
-      placeholder: {
-        type: "plain_text",
-        text: "\u79D1\u76EE\u3092\u9078\u629E...",
-      },
-      options: remaining.map((s) => ({
-        text: {
-          type: "plain_text" as const,
-          text: `${s.subject_name} (${s.credits}\u5358\u4F4D)`,
-        },
-        value: JSON.stringify({
-          subject_id: s.subject_id,
-          subject_name: s.subject_name,
-          credits: s.credits,
-        }),
-      })),
-    },
-  });
-
-  blocks.push({
-    type: "input",
-    block_id: `progress_block_${form_seq}`,
-    label: { type: "plain_text", text: "\u9032\u6357\u7387 (%)" },
-    element: {
-      type: "number_input",
-      action_id: "progress_input",
-      is_decimal_allowed: false,
-      min_value: "0",
-      max_value: "100",
-      placeholder: { type: "plain_text", text: "0\u301C100" },
-    },
-  });
+  blocks.push(
+    ...buildSubjectProgressBlocks(remaining, metadata, options?.initialValues),
+  );
 
   blocks.push({
     type: "actions",
@@ -207,10 +256,11 @@ export async function handleLogProgressSubmission(
   // deno-lint-ignore no-explicit-any
   const state = view.state as any;
   const subjectValue = JSON.parse(
-    state.values[`subject_block_${seq}`].subject_select.selected_option!.value,
+    state.values[subjectBlockId(metadata)].subject_select.selected_option!
+      .value,
   );
   const progressPct = Number(
-    state.values[`progress_block_${seq}`].progress_input.value,
+    state.values[progressBlockId(metadata)].progress_input.value,
   );
 
   const putRes = await client.apps.datastore.put({
@@ -227,7 +277,7 @@ export async function handleLogProgressSubmission(
     return {
       response_action: "errors" as const,
       errors: {
-        [`subject_block_${seq}`]:
+        [subjectBlockId(metadata)]:
           `\u4FDD\u5B58\u306B\u5931\u6557\u3057\u307E\u3057\u305F: ${putRes.error}`,
       },
     };
@@ -240,6 +290,7 @@ export async function handleLogProgressSubmission(
     progress_pct: progressPct,
   });
   metadata.form_seq = seq + 1;
+  metadata.current_prefill = undefined;
 
   return {
     response_action: "update" as const,
@@ -258,12 +309,11 @@ export async function handleLogProgressAndFinish(
   viewOptions?: { includeHomeButton?: boolean },
 ): Promise<void> {
   const metadata: LogProgressMeta = JSON.parse(body.view.private_metadata);
-  const seq = metadata.form_seq;
   // deno-lint-ignore no-explicit-any
   const state = body.view.state as any;
 
-  const subjectBlock = state.values[`subject_block_${seq}`];
-  const progressBlock = state.values[`progress_block_${seq}`];
+  const subjectBlock = state.values[subjectBlockId(metadata)];
+  const progressBlock = state.values[progressBlockId(metadata)];
 
   if (
     !subjectBlock?.subject_select?.selected_option?.value ||
@@ -290,43 +340,15 @@ export async function handleLogProgressAndFinish(
       },
     });
     warningBlocks.push({ type: "divider" });
-    warningBlocks.push({
-      type: "input",
-      block_id: `subject_block_${seq}`,
-      label: { type: "plain_text", text: "\u79D1\u76EE" },
-      element: {
-        type: "static_select",
-        action_id: "subject_select",
-        placeholder: {
-          type: "plain_text",
-          text: "\u79D1\u76EE\u3092\u9078\u629E...",
-        },
-        options: remaining.map((s) => ({
-          text: {
-            type: "plain_text" as const,
-            text: `${s.subject_name} (${s.credits}\u5358\u4F4D)`,
-          },
-          value: JSON.stringify({
-            subject_id: s.subject_id,
-            subject_name: s.subject_name,
-            credits: s.credits,
-          }),
-        })),
-      },
-    });
-    warningBlocks.push({
-      type: "input",
-      block_id: `progress_block_${seq}`,
-      label: { type: "plain_text", text: "\u9032\u6357\u7387 (%)" },
-      element: {
-        type: "number_input",
-        action_id: "progress_input",
-        is_decimal_allowed: false,
-        min_value: "0",
-        max_value: "100",
-        placeholder: { type: "plain_text", text: "0\u301C100" },
-      },
-    });
+    const initialValues = warningMeta.current_prefill
+      ? {
+        selectedValue: warningMeta.current_prefill.selected_value,
+        progressPct: warningMeta.current_prefill.progress_pct,
+      }
+      : undefined;
+    warningBlocks.push(
+      ...buildSubjectProgressBlocks(remaining, warningMeta, initialValues),
+    );
     warningBlocks.push({
       type: "actions",
       block_id: "finish_action_block",
@@ -424,6 +446,54 @@ export async function handleLogProgressAndFinish(
       blocks: doneBlocks,
     },
   });
+}
+
+// ----- Subject selection change handler -----
+
+export async function handleSubjectSelectChange(
+  // deno-lint-ignore no-explicit-any
+  client: any,
+  // deno-lint-ignore no-explicit-any
+  body: any,
+  viewOptions?: { includeHomeButton?: boolean },
+): Promise<void> {
+  const metadata: LogProgressMeta = JSON.parse(body.view.private_metadata);
+  const selectedRaw = body.actions[0].selected_option.value as string;
+  const selected = JSON.parse(selectedRaw);
+
+  if (metadata.current_prefill?.subject_id === selected.subject_id) {
+    return;
+  }
+
+  // 主キー(subject_id)による1件取得。未記録の場合は ok: true, item: {} が返る
+  const progressRes = await client.apps.datastore.get({
+    datastore: ProgressDatastore.definition.name,
+    id: selected.subject_id,
+  });
+  const progressPct = progressRes.ok &&
+      typeof progressRes.item?.progress_pct === "number"
+    ? (progressRes.item.progress_pct as number)
+    : 0;
+
+  metadata.current_prefill = {
+    subject_id: selected.subject_id,
+    progress_pct: progressPct,
+    selected_value: selectedRaw,
+  };
+
+  const updateRes = await client.views.update({
+    view_id: body.view.id,
+    view: buildLogProgressView(metadata, {
+      ...viewOptions,
+      initialValues: { selectedValue: selectedRaw, progressPct },
+    }),
+  });
+  if (!updateRes.ok) {
+    console.error(
+      `views.update failed in handleSubjectSelectChange: ${updateRes.error}`,
+      JSON.stringify(updateRes.response_metadata ?? {}),
+    );
+  }
 }
 
 // ----- Summary message -----
